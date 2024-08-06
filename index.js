@@ -26,60 +26,64 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
         const fileName = `biometric-scans.txt`
 
         const cronJob = async () => {
-            let date = moment().format(`YYYY-MM-DD hh:mm A`)
-            // console.log(`${date}: Task started..`)
+            try {
+                let date = moment().format(`YYYY-MM-DD hh:mm A`)
+                // console.log(`${date}: Task started..`)
 
-            let file = readFileSync(`${APP_DIR}/${fileName}`)
-            // getHash(file)
+                let file = readFileSync(`${APP_DIR}/${fileName}`)
+                // getHash(file)
 
-            file = file.toString('utf-8')
-            let rows = file.split("\n").map(r => {
-                return r.split(", ")
-            })
+                file = file.toString('utf-8')
+                let rows = file.split("\n").map(r => {
+                    return r.split(", ")
+                })
 
-            rows.sort(function (a, b) {
-                let dateTimeA = moment(`${a[1]} ${a[2]}`, 'YYYY-MM-DD hh:mm:ss A', true)
-                let dateTimeB = moment(`${b[1]} ${b[2]}`, 'YYYY-MM-DD hh:mm:ss A', true)
-                if (dateTimeA.isBefore(dateTimeB)) {
-                    return -1;
+                rows.sort(function (a, b) {
+                    let dateTimeA = moment(`${a[1]} ${a[2]}`, 'YYYY-MM-DD hh:mm:ss A', true)
+                    let dateTimeB = moment(`${b[1]} ${b[2]}`, 'YYYY-MM-DD hh:mm:ss A', true)
+                    if (dateTimeA.isBefore(dateTimeB)) {
+                        return -1;
+                    }
+                    if (dateTimeA.isAfter(dateTimeB)) {
+                        return 1;
+                    }
+                    return 0;
+                });
+
+                rows = lodashGroupBy(rows, (row) => row[1])
+                // console.log(rows)
+
+                let postData = {
+                    username: rest[0],
+                    password: rest[1]
                 }
-                if (dateTimeA.isAfter(dateTimeB)) {
-                    return 1;
+                let response = await fetch(`${url}/login`, {
+                    method: 'POST',
+                    body: JSON.stringify(postData),
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                if (!response.ok) {
+                    throw new Error(await response.text())
                 }
-                return 0;
-            });
+                let jwt = await response.text()
 
-            rows = lodashGroupBy(rows, (row) => row[1])
-            // console.log(rows)
-
-            let postData = {
-                username: rest[0],
-                password: rest[1]
+                response = await fetch(`${url}/app/biometric/scans`, {
+                    method: 'POST',
+                    body: JSON.stringify(rows),
+                    headers: {
+                        'Authorization': `Bearer ${jwt}`,
+                        'Content-Type': 'application/json',
+                    }
+                })
+                if (!response.ok) {
+                    throw new Error(await response.text())
+                }
+                console.log(await response.text())
+            } catch (err) {
+                console.error(err)
             }
-            let response = await fetch(`${url}/login`, {
-                method: 'POST',
-                body: JSON.stringify(postData),
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            if (!response.ok) {
-                throw new Error(await response.text())
-            }
-            let jwt = await response.text()
-
-            response = await fetch(`${url}/app/biometric/scans`, {
-                method: 'POST',
-                body: JSON.stringify(rows),
-                headers: {
-                    'Authorization': `Bearer ${jwt}`,
-                    'Content-Type': 'application/json',
-                }
-            })
-            if (!response.ok) {
-                throw new Error(await response.text())
-            }
-            console.log(await response.text())
 
         }
         await cronJob()

@@ -34,8 +34,8 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                 // getHash(file)
 
                 file = file.toString('utf-8')
-                let rows = file.split("\n").map(r => {
-                    return r.split(", ")
+                let rows = file.split("\n")?.map(r => {
+                    return r.split(", ")?.map(c => c?.trim())
                 })
 
                 rows.sort(function (a, b) {

@@ -9,6 +9,7 @@ const process = require('process')
 //// External modules
 const lodashGroupBy = require('lodash.groupby')
 const moment = require('moment')
+const { Sequelize } = require('sequelize')
 
 //// Modules
 
@@ -20,7 +21,20 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
 (async () => {
     try {
         [url, ...rest] = process.argv.slice(2)
+
         // console.log(url, rest)
+
+        const sequelize = new Sequelize({
+            dialect: 'sqlite',
+            storage: `${APP_DIR}/logs.db`,
+            logging: false,
+        });
+        await sequelize.authenticate()
+        const Log = require(`${APP_DIR}/models/log`)('Log', sequelize)
+
+        await Log.sync() // This creates the table if it doesn't exist (and does nothing if it already exists)
+
+        // console.log(`${moment().format('MMM-DD-YYYY hh:mmA')}: ---- Database Connected ----`)
         console.log(`${moment().format('MMM-DD-YYYY hh:mmA')}: ---- Task Started ----`)
 
         const fileName = `biometric-scans.txt`
@@ -39,6 +53,23 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                 // Today only
                 rows = rows.filter(r => {
                     return moment().format('YYYY-MM-DD') === r.at(1)
+                })
+
+                // Check logs.db if the entry is already in it
+                let promises = rows.map(r => {
+                    return Log.findOne({
+                        where: {
+                            bid: r.at(0),
+                            date: r.at(1),
+                            time: r.at(2),
+                        }
+                    })
+                })
+                let results = await Promise.all(promises)
+
+                // Remove it from the rows to be send to the server
+                rows = rows.filter((r, i) => {
+                    return (results[i]) ? false : true
                 })
 
                 // Sort from earliest log
@@ -76,7 +107,7 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                 // Group by date
                 rows = lodashGroupBy(rows, (row) => row[1])
                 // console.log(rows)
-                
+
                 // Structure after groupBy
                 /**
                  * {
@@ -122,6 +153,30 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                 let outext = await response.text()
                 console.log(outext)
                 writeFileSync(`${APP_DIR}/${moment().format('MMM-DD-YYYY')}.log`, outext, { encoding: 'utf8', flag: 'w' })
+
+                let logsArray = outext.trim().split("\n").map(s => s.trim())
+                logsArray = logsArray.slice(1, -1)
+                logsArray = logsArray.filter(s => {
+                    return s.includes('CREATED')
+                })
+                logsArray = logsArray.map(s => {
+                    return s.split(',').map(b => b.trim())
+                })
+                for (let a = 0; a < logsArray.length; a++) {
+                    await Log.findOrCreate({
+                        where: {
+                            bid: logsArray[a].at(0),
+                            date: logsArray[a].at(3),
+                            time: logsArray[a].at(4),
+                        },
+                        defaults: {
+                            bid: logsArray[a].at(0),
+                            date: logsArray[a].at(3),
+                            time: logsArray[a].at(4),
+                        },
+                    });
+                }
+
             } catch (err) {
                 console.error(err)
             }

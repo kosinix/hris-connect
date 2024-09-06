@@ -2,10 +2,9 @@
  * node index.js http://localhost:9094/api fingerprint.scanner.1 pword
  */
 //// Core modules
-const { watchFile, writeFileSync } = require('fs')
+const { watchFile, writeFileSync, readFileSync, existsSync } = require('fs')
 const path = require('path')
 const process = require('process')
-const { readFileSync } = require('fs')
 
 //// External modules
 const lodashGroupBy = require('lodash.groupby')
@@ -35,6 +34,11 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                 file = file.toString('utf-8').trim()
                 let rows = file.split("\n")?.map(r => {
                     return r.split(", ")?.map(c => c?.trim())
+                })
+
+                // Today only
+                rows = rows.filter(r => {
+                    return moment().format('YYYY-MM-DD') === r.at(1)
                 })
 
                 // Sort from earliest log
@@ -69,9 +73,10 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                     }
                 })
 
+                // Group by date
                 rows = lodashGroupBy(rows, (row) => row[1])
                 // console.log(rows)
-
+                
                 // Structure after groupBy
                 /**
                  * {
@@ -116,7 +121,7 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                 }
                 let outext = await response.text()
                 console.log(outext)
-                writeFileSync(`${APP_DIR}/${moment().format('MMM-DD-YYYY_hhmmssA')}.log`, outext, {enoding:'utf8'})
+                writeFileSync(`${APP_DIR}/${moment().format('MMM-DD-YYYY')}.log`, outext, { encoding: 'utf8', flag: 'w' })
             } catch (err) {
                 console.error(err)
             }

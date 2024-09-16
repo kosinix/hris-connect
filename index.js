@@ -1,5 +1,6 @@
 /**
  * node index.js http://localhost:9094/api fingerprint.scanner.1 pword
+ * node index.js http://localhost:9094/api fingerprint.scanner.1 pword 2024-09-13
  */
 //// Core modules
 const { watchFile, writeFileSync, readFileSync, existsSync } = require('fs')
@@ -21,6 +22,8 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
 (async () => {
     try {
         [url, ...rest] = process.argv.slice(2)
+
+        const DATE_TO_PROCESS = (rest.at(2)) ? moment(rest.at(2)) : moment()
 
         // console.log(url, rest)
 
@@ -52,7 +55,7 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
 
                 // Today only
                 rows = rows.filter(r => {
-                    return moment().format('YYYY-MM-DD') === r.at(1)
+                    return DATE_TO_PROCESS.clone().format('YYYY-MM-DD') === r.at(1)
                 })
 
                 // Check logs.db if the entry is already in it
@@ -139,7 +142,11 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                 }
                 let jwt = await response.text()
 
-                response = await fetch(`${url}/app/biometric/scans`, {
+                let endPoint = `${url}/app/biometric/scans`
+                if(endPoint) {
+                    endPoint = `${url}/app/biometric/scans?date=${DATE_TO_PROCESS.format('YYYY-MM-DD')}`
+                }
+                response = await fetch(endPoint, {
                     method: 'POST',
                     body: JSON.stringify(rows),
                     headers: {
@@ -152,7 +159,7 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                 }
                 let outext = await response.text()
                 console.log(outext)
-                writeFileSync(`${APP_DIR}/${moment().format('MMM-DD-YYYY')}.log`, outext, { encoding: 'utf8', flag: 'w' })
+                writeFileSync(`${APP_DIR}/${DATE_TO_PROCESS.clone().format('MMM-DD-YYYY')}.log`, outext, { encoding: 'utf8', flag: 'w' })
 
                 let logsArray = outext.trim().split("\n").map(s => s.trim())
                 logsArray = logsArray.slice(1, -1)

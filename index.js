@@ -21,11 +21,11 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
 
 (async () => {
     try {
-        [url, ...rest] = process.argv.slice(2)
+        [url, ...CMD_ARGS] = process.argv.slice(2)
 
-        const DATE_TO_PROCESS = (rest.at(2)) ? moment(rest.at(2)) : moment()
+        
 
-        // console.log(url, rest)
+        // console.log(url, CMD_ARGS)
 
         const sequelize = new Sequelize({
             dialect: 'sqlite',
@@ -42,7 +42,7 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
 
         const fileName = `biometric-scans.txt`
 
-        const cronJob = async () => {
+        const cronJob = async (DATE_TO_PROCESS) => {
             try {
 
                 let file = readFileSync(`${APP_DIR}/${fileName}`)
@@ -127,8 +127,8 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
                 **/
 
                 let postData = {
-                    username: rest[0],
-                    password: rest[1]
+                    username: CMD_ARGS[0],
+                    password: CMD_ARGS[1]
                 }
                 let response = await fetch(`${url}/login`, {
                     method: 'POST',
@@ -194,8 +194,11 @@ global.APP_DIR = path.resolve(__dirname).replace(/\\/g, '/'); // Turn back slash
 
         watchFile(`${APP_DIR}/${fileName}`, async (curr, prev) => {
             if (curr.mtimeMs > prev.mtimeMs && curr.size !== prev.size) {
-                console.log(`${moment().format('MMM-DD-YYYY hh:mmA')}: File change detected, uploading file...`)
-                await cronJob()
+
+                const DATE_TO_PROCESS = (CMD_ARGS.at(2)) ? moment(CMD_ARGS.at(2)) : moment()
+
+                console.log(`${moment().format('MMM-DD-YYYY hh:mmA')}: File change detected, uploading file for ${DATE_TO_PROCESS.format('dddd MMM DD, YYYY')}...`)
+                await cronJob(DATE_TO_PROCESS)
             }
         });
     } catch (err) {
